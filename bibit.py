@@ -126,7 +126,7 @@ class RollingPortofolioHistoryStore:
         self._store.save()
     
     def _init_inner_store(self, filename):
-        storage = JSONFileStorage(filename)
+        storage = self.portofolio_history_storage_klass(filename)
         self._store = self.portofolio_history_store_klass(storage)
         self._store.init()
 
@@ -266,7 +266,7 @@ class BibitNotifyJob:
             current_profit = current_value - current_invested
             change_percentage = 1.0 * (current_profit - last_profit) / current_invested
 
-            if current_value != last_value:
+            if int(current_value) != int(last_value):
                 should_send = True
 
             formatted = self._format_message(porto_item['name'], change_percentage, current_value, current_profit)
