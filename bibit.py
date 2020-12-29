@@ -177,7 +177,7 @@ class BibitAPI:
         token = res.json()['data']['token']
         self.secret_storage.access_token = token['access_token']
         self.secret_storage.refresh_token = token['refresh_token']
-        self.secret_storage.dump()
+        self.secret_storage.save()
 
     def request(self, method, url, data={}):
         res = self._request(method, url, data)
@@ -279,8 +279,9 @@ class BibitNotifyJob:
         portofolio = self.bibit_api.get_portofolio()
         cleaned = self._clean_porto(portofolio['data'])
         should_send, message = self._construct_message(cleaned)
-        self.telegram_api.send_message(message)
-        self.portofolio_history_store.add(cleaned)
+        if should_send:
+            self.telegram_api.send_message(message)
+            self.portofolio_history_store.add(cleaned)
 
 
 def get_absolute_path(path):
