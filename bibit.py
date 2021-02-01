@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
 import os, requests, json, time
+from Crypto.Cipher import AES
+
+
+class AESDecryptor:
+    def decrypt(self, data):
+        iv = bytes.fromhex(data[:32])
+        enc = bytes.fromhex(data[32:-32])
+        key = data[-32:]
+
+        cipher = AES.new(key, AES.MODE_CBC, iv)
+        return cipher.decrypt(enc)
 
 
 class StoreNotInitializedError(Exception):
@@ -135,9 +146,12 @@ class RollingPortofolioHistoryStore:
         self._init_inner_store(latest_filename)
 
 
+
+
 class BibitAPI:
-    def __init__(self, secret_storage):
+    def __init__(self, secret_storage, decrypter):
         self.secret_storage = secret_storage
+        self.decrypter = decrypter
     
     def _request(self, method, endpoint, data={}, allow_fail=True):
         headers = {
@@ -192,6 +206,15 @@ class BibitAPI:
          
     def get_portofolio(self):
         return self.request('GET', "/portfolio").json()
+
+    def get_product(self, id):
+        res = self.request('GET', f"/products/{id}").json()
+        if 'data' in res:
+            res['data'] = json.loads(self.decrypter.decrypt(res['data']))
+        return res
+
+    def get_portofolio_category(self, id):
+        return self.request('GET', f"/portofolio/category/{id}")
         
 
 class TelegramAPI:
@@ -262,6 +285,9 @@ class BibitNotifyJob:
             last_profit = last_value - last_porto_item.get('invested', 0)
 
             current_invested = porto_item['invested']
+            if current_invested == 0:
+                continue
+
             current_value = porto_item['marketvalue']
             current_profit = current_value - current_invested
             change_percentage = 1.0 * (current_profit - last_profit) / current_invested
@@ -310,7 +336,8 @@ if __name__ == '__main__':
     secret_store = new_secret_store() 
     portofolio_history_store = new_rolling_portofolio_history_store()
     
-    bibit_api = BibitAPI(secret_store)
+    decryptor = AESDecryptor()
+    bibit_api = BibitAPI(secret_store, decryptor)
     telegram_api = TelegramAPI(secret_store)
     
     job = BibitNotifyJob(bibit_api, telegram_api, portofolio_history_store)
